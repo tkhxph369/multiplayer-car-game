@@ -115,10 +115,9 @@ console.log('Server Type: Mobile Data (USB Tethering)');
 
 // Add error handling for the server
 http.on('error', (error) => {
+    console.error('Server error:', error);
     if (error.code === 'EADDRINUSE') {
         console.error(`Port ${PORT} is already in use. Please try a different port or close the application using this port.`);
-    } else {
-        console.error('Server error:', error);
     }
     process.exit(1);
 });
