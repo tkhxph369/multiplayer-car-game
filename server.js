@@ -1,7 +1,12 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const io = require('socket.io')(http, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 const path = require('path');
 
 // Error handling middleware
@@ -101,39 +106,14 @@ io.on('connection', (socket) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 3000;
-const HOSTNAME = process.env.HOSTNAME || '0.0.0.0';
+const PORT = process.env.PORT || 10000;
 
 console.log('Starting server with configuration:');
 console.log('PORT:', PORT);
-console.log('HOSTNAME:', HOSTNAME);
 console.log('Current directory:', __dirname);
 console.log('Process ID:', process.pid);
-console.log('NO-IP DNS:', 'multiplayercardrive.ddns.net');
-console.log('Public IP:', '5.102.238.118');
-console.log('Server Type: Mobile Data (USB Tethering)');
 
-// Add error handling for the server
-http.on('error', (error) => {
-    console.error('Server error:', error);
-    if (error.code === 'EADDRINUSE') {
-        console.error(`Port ${PORT} is already in use. Please try a different port or close the application using this port.`);
-    }
-    process.exit(1);
-});
-
-try {
-    http.listen(PORT, HOSTNAME, () => {
-        console.log(`Server running on port ${PORT}`);
-        console.log(`Local access: http://localhost:${PORT}`);
-        console.log(`External access: http://${process.env.RENDER_EXTERNAL_URL || 'localhost'}:${PORT}`);
-        console.log('Press Ctrl+C to stop the server');
-        console.log('\nTroubleshooting Info:');
-        console.log('- Make sure NO-IP DUC is running with green ticks');
-        console.log('- Verify mobile carrier allows port 8080');
-        console.log('- Check firewall rules for both inbound and outbound');
-    });
-} catch (err) {
-    console.error('Failed to start server:', err);
-    process.exit(1);
-} 
+http.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Game URL: https://multiplayer-car-game.onrender.com`);
+}); 
