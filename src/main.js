@@ -389,6 +389,42 @@ let chatContainer = document.getElementById('chatContainer');
 // Initialize chat as hidden
 chatContainer.style.display = 'none';
 
+// Add these variables at the top with other game state variables
+let assetsLoaded = false;
+let loadingManager = new THREE.LoadingManager();
+
+// Modify the loading manager setup
+loadingManager.onLoad = () => {
+    console.log('All assets loaded successfully');
+    assetsLoaded = true;
+    hideLoadingScreen();
+};
+
+loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+    console.log(`Loading progress: ${(itemsLoaded / itemsTotal * 100).toFixed(2)}%`);
+    updateLoadingProgress(itemsLoaded / itemsTotal);
+};
+
+loadingManager.onError = (url) => {
+    console.error('Error loading asset:', url);
+};
+
+// Add this new function
+function updateLoadingProgress(progress) {
+    const loadingText = document.querySelector('.loading-text');
+    if (loadingText) {
+        loadingText.textContent = `Loading game ${(progress * 100).toFixed(0)}%`;
+    }
+}
+
+// Add this new function
+function hideLoadingScreen() {
+    if (assetsLoaded) {
+        loadingScreen.style.display = 'none';
+        startMenu.style.display = 'flex';
+    }
+}
+
 // Add this function to update the leaderboard display
 function updateLeaderboard() {
     if (!leaderboardElement) return;
@@ -485,12 +521,6 @@ function init() {
     // Set canvas size
     miniMapCanvas.width = 200;
     miniMapCanvas.height = 200;
-
-    // Show loading screen for 6 seconds
-    setTimeout(() => {
-        loadingScreen.style.display = 'none';
-        startMenu.style.display = 'flex';
-    }, 6000);
 
     // Setup start menu event listeners
     playButton.addEventListener('click', () => {
@@ -604,10 +634,6 @@ function createTerrain() {
     const geometry = new THREE.PlaneGeometry(5000, 5000, 100, 100);
     
     // Create texture loader with loading manager for debugging
-    const loadingManager = new THREE.LoadingManager();
-    loadingManager.onLoad = () => console.log('All textures loaded successfully');
-    loadingManager.onError = (url) => console.error('Error loading texture:', url);
-    
     const textureLoader = new THREE.TextureLoader(loadingManager);
     
     // Create material first
@@ -744,12 +770,6 @@ function loadCarModel() {
     console.log('Starting to load car model...');
     const loader = new GLTFLoader();
     
-    // Add loading manager for better error handling
-    const loadingManager = new THREE.LoadingManager();
-    loadingManager.onError = (url) => {
-        console.error('Error loading:', url);
-    };
-    
     loader.setPath('/models/');
     
     loader.load(
@@ -788,11 +808,9 @@ function loadCarModel() {
             
             console.log('Car model setup complete with shadow casting enabled');
         },
-        // Progress callback
         (xhr) => {
             console.log('Loading progress:', (xhr.loaded / xhr.total * 100) + '%');
         },
-        // Error callback
         (error) => {
             console.error('Error loading car model:', error);
             createBasicCar();
