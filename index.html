@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Car Driving (BETA)</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            -webkit-user-select: none;  /* Chrome, Safari, Opera */
+            -moz-user-select: none;     /* Firefox */
+            -ms-user-select: none;      /* IE/Edge */
+            user-select: none;          /* Standard */
+        }
+        canvas {
+            display: block;
+            position: relative;
+            z-index: 1;
+        }
+        #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 2000; /* Higher than everything else */
+        }
+        .loading-text {
+            color: white;
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8),
+                         0 0 20px rgba(255, 255, 255, 0.6),
+                         0 0 30px rgba(255, 255, 255, 0.4);
+            animation: loadingGlowPulse 2s infinite alternate;
+        }
+        @keyframes loadingGlowPulse {
+            from {
+                text-shadow: 0 0 10px rgba(255, 255, 255, 0.8),
+                            0 0 20px rgba(255, 255, 255, 0.6),
+                            0 0 30px rgba(255, 255, 255, 0.4);
+            }
+            to {
+                text-shadow: 0 0 15px rgba(255, 255, 255, 0.9),
+                            0 0 25px rgba(255, 255, 255, 0.7),
+                            0 0 35px rgba(255, 255, 255, 0.5);
+            }
+        }
+        .loading-circle {
+            width: 100px;
+            height: 100px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        #menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            z-index: 100;
+        }
+        #startMenu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95);
+            display: none; /* Start hidden */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: white;
+            z-index: 1000;
+            transition: background-color 1s ease-out, opacity 1s ease-out;
+        }
+        #startMenu.fade-to-black {
+            background-color: rgba(0, 0, 0, 1);
+        }
+        #startMenu.fade-out {
+            opacity: 0;
+            pointer-events: none;
+            background-color: rgba(0, 0, 0, 1);
+        }
+        #transitionOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: black;
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1s ease-out;
+        }
+        #transitionOverlay.visible {
+            opacity: 1;
+        }
+        .game-title {
+            font-size: 3em;
+            font-weight: bold;
+            color: #E6E6FA; /* Light blue-white color */
+            text-align: center;
+            margin-bottom: 50px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            pointer-events: none;
+            /* Updated glow effect with dark blue tint */
+            text-shadow: 0 0 10px rgba(0, 0, 139, 0.8),
+                         0 0 20px rgba(0, 0, 139, 0.6),
+                         0 0 30px rgba(0, 0, 139, 0.4);
+            animation: glowPulse 2s infinite alternate;
+        }
+        @keyframes glowPulse {
+            from {
+                text-shadow: 0 0 10px rgba(0, 0, 139, 0.8),
+                            0 0 20px rgba(0, 0, 139, 0.6),
+                            0 0 30px rgba(0, 0, 139, 0.4);
+            }
+            to {
+                text-shadow: 0 0 15px rgba(0, 0, 139, 0.9),
+                            0 0 25px rgba(0, 0, 139, 0.7),
+                            0 0 35px rgba(0, 0, 139, 0.5);
+            }
+        }
+        .menu-button {
+            width: 300px;
+            padding: 20px 40px;
+            margin: 15px;
+            font-size: 24px;
+            background-color: white;
+            color: #00008B;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            -webkit-user-select: none;  /* Chrome, Safari, Opera */
+            -moz-user-select: none;     /* Firefox */
+            -ms-user-select: none;      /* IE/Edge */
+            user-select: none;          /* Standard */
+        }
+        .menu-button:hover {
+            background-color: #f0f0f0;
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+        }
+        #controls, #settings {
+            display: none;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .slider-container {
+            margin: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        /* Add this new style for the speedometer */
+        #speedometer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1; /* Place it above the canvas but below the menus */
+            display: none; /* Start hidden */
+        }
+        .username-input {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .username-input label {
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .username-input input {
+            padding: 8px 12px;
+            font-size: 16px;
+            border: 2px solid #00008B;
+            border-radius: 4px;
+            background-color: rgba(255, 255, 255, 0.9);
+            color: #00008B;
+            width: 200px;
+            transition: all 0.3s ease;
+        }
+
+        .username-input input:focus {
+            outline: none;
+            border-color: #0000CD;
+            box-shadow: 0 0 5px rgba(0, 0, 139, 0.5);
+        }
+
+        #miniMap {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            width: 200px;
+            height: 200px;
+            background-color: rgba(0, 0, 0, 0.3);
+            border: 2px solid #00008B;
+            border-radius: 4px;
+            display: none;
+            z-index: 10;
+            overflow: hidden;
+            backdrop-filter: blur(2px);
+        }
+
+        #miniMapCanvas {
+            width: 100%;
+            height: 100%;
+            opacity: 0.5; /* Make the map slightly transparent */
+        }
+
+        .player-marker {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: #00008B;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 11; /* Ensure marker is above the map */
+        }
+
+        .player-name {
+            position: absolute;
+            color: white;
+            font-size: 14px; /* Slightly larger font */
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black,
+                        -1px -1px 2px black,
+                        1px -1px 2px black,
+                        -1px 1px 2px black; /* Enhanced text shadow for better visibility */
+            transform: translate(-50%, -120%); /* Move name higher above marker */
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 12; /* Ensure name is above everything */
+            background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent background for text */
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .menu-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 30px;
+            width: 300px;
+        }
+
+        .input-container {
+            position: relative;
+            width: 100%;
+        }
+
+        .input-container input,
+        .input-container select {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(230, 230, 250, 0.3);
+            border-radius: 8px;
+            color: #E6E6FA;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            outline: none;
+            box-sizing: border-box; /* Add this to ensure consistent width */
+        }
+
+        .input-container input:focus,
+        .input-container select:focus {
+            border-color: rgba(230, 230, 250, 0.7);
+            box-shadow: 0 0 10px rgba(0, 0, 139, 0.5);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .input-container input::placeholder {
+            color: rgba(230, 230, 250, 0.5);
+        }
+
+        .input-container select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23E6E6FA'%3e%3cpath d='M7 10l5 5 5-5z'/%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 15px center;
+            background-size: 20px;
+            padding-right: 40px;
+        }
+
+        .input-container select option {
+            background: rgba(0, 0, 0, 0.9);
+            color: #E6E6FA;
+            padding: 10px;
+        }
+
+        #chatContainer {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            width: 400px;
+            height: 200px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #chatMessages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            line-height: 1.4;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            max-height: calc(100% - 50px); /* Reserve space for input container */
+            position: relative; /* Add this to ensure proper stacking context */
+        }
+
+        #chatInputContainer {
+            padding: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.3);
+            flex-shrink: 0;
+            position: absolute; /* Change from sticky to absolute */
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            box-sizing: border-box;
+            z-index: 2; /* Increase z-index to ensure it stays above messages */
+        }
+
+        #chatInput {
+            width: 100%;
+            padding: 6px 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 13px;
+            outline: none;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        #chatInput::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 13px;
+        }
+
+        #chatInput:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 0 0 5px rgba(0, 0, 139, 0.5);
+        }
+
+        .chat-message {
+            margin-bottom: 8px;
+            word-break: break-word;
+        }
+
+        .chat-username {
+            color: #E6E6FA;
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        #chatMessages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #chatMessages::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        #chatMessages::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        #chatMessages::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .leaderboard {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 200px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingScreen">
+        <div class="loading-text">Loading game</div>
+        <div class="loading-circle"></div>
+    </div>
+    <div id="startMenu">
+        <h1 class="game-title">Welcome to Multiplayer Car Driving (BETA)</h1>
+        <div class="menu-input-group">
+            <div class="input-container">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Enter your username" maxlength="20">
+            </div>
+            <div class="input-container">
+                <label for="carSelect">Choose Car</label>
+                <select id="carSelect">
+                    <option value="audi_tt_rs">Audi TT RS</option>
+                </select>
+            </div>
+        </div>
+        <button id="playButton" class="menu-button">Play</button>
+        <button id="exitButton" class="menu-button">Exit</button>
+    </div>
+
+    <div id="menu">
+        <button id="resume" class="menu-button">Resume</button>
+        <button id="controlsBtn" class="menu-button">Controls</button>
+        <button id="settingsBtn" class="menu-button">Settings</button>
+        <button id="exit" class="menu-button">Exit</button>
+        
+        <div id="controls">
+            <h2>Controls</h2>
+            <p>W - Accelerate</p>
+            <p>S - Brake/Reverse</p>
+            <p>A - Turn Left</p>
+            <p>D - Turn Right</p>
+            <p>Q - Shift Down</p>
+            <p>E - Shift Up</p>
+            <p>ESC - Pause Menu</p>
+        </div>
+        
+        <div id="settings">
+            <h2>Settings</h2>
+            <div class="slider-container">
+                <label for="resolution">Resolution Scale:</label>
+                <input type="range" id="resolution" min="50" max="100" value="100">
+            </div>
+            <div class="slider-container">
+                <label for="volume">Volume:</label>
+                <input type="range" id="volume" min="0" max="100" value="100">
+            </div>
+            <div class="slider-container">
+                <label for="fullscreen">Fullscreen:</label>
+                <input type="checkbox" id="fullscreen">
+            </div>
+        </div>
+    </div>
+
+    <div id="miniMap">
+        <canvas id="miniMapCanvas"></canvas>
+        <div class="player-marker"></div>
+        <div class="player-name"></div>
+    </div>
+
+    <div id="chatContainer">
+        <div id="chatMessages"></div>
+        <div id="chatInputContainer">
+            <input type="text" id="chatInput" placeholder="To chat click here or press / key" maxlength="100">
+        </div>
+    </div>
+
+    <div id="transitionOverlay"></div>
+
+    <script type="module" src="src/main.js"></script>
+</body>
+</html> 

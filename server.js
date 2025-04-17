@@ -1,0 +1,140 @@
+const express = require('express');
+const app = express();
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
+const path = require('path');
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Server error:', err);
+    res.status(500).send('Something broke!');
+});
+
+// Debug logging for requests
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+});
+
+// Serve the main index.html from root
+app.get('/', (req, res) => {
+    try {
+        console.log('Serving index.html from root');
+        res.sendFile(path.join(__dirname, 'index.html'));
+    } catch (err) {
+        console.error('Error serving index.html:', err);
+        res.status(500).send('Error loading game');
+    }
+});
+
+// Serve static files from the src directory
+app.use('/src', express.static(path.join(__dirname, 'src')));
+
+// Serve static files from the public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Add a route to get texture URLs
+app.get('/texture-urls', (req, res) => {
+    res.json({
+        sunset: 'https://drive.google.com/uc?export=download&id=1wTUHG_Ek0JpR2eIpf0WUE8tYFvCmcCgO',
+        terrainDiff: 'https://drive.google.com/uc?export=download&id=1vNirPuEnwrDoJtGqApQteyuI00vFCWVn',
+        terrainNormal: 'https://drive.google.com/uc?export=download&id=1p8zdeWtbv5hLtaARg9LKQfO88AuJfSnV',
+        carModel: 'https://drive.google.com/uc?export=download&id=15K6krbc54hUXHBOZlB9eMFXNAFz2cg7z'
+    });
+});
+
+// Store connected players
+const players = new Map();
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+    console.log('A user connected:', socket.id);
+
+    // Handle player joining
+    socket.on('playerJoin', (playerData) => {
+        console.log('Player joined:', playerData);
+        players.set(socket.id, {
+            username: playerData.username,
+            position: playerData.position,
+            rotation: playerData.rotation
+        });
+        
+        // Send current players to the new player
+        socket.emit('currentPlayers', Array.from(players.entries()));
+        
+        // Notify other players about the new player
+        socket.broadcast.emit('playerJoined', {
+            id: socket.id,
+            ...playerData
+        });
+    });
+
+    // Handle player movement
+    socket.on('playerMove', (data) => {
+        if (players.has(socket.id)) {
+            players.get(socket.id).position = data.position;
+            players.get(socket.id).rotation = data.rotation;
+            socket.broadcast.emit('playerMoved', {
+                id: socket.id,
+                position: data.position,
+                rotation: data.rotation
+            });
+        }
+    });
+
+    // Handle chat messages
+    socket.on('chatMessage', (message) => {
+        const username = players.get(socket.id)?.username || 'Unknown';
+        console.log(`Chat message from ${username}:`, message);
+        io.emit('chatMessage', {
+            username: username,
+            text: message
+        });
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
+        players.delete(socket.id);
+        io.emit('playerLeft', socket.id);
+    });
+});
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+const HOSTNAME = process.env.HOSTNAME || '0.0.0.0';
+
+console.log('Starting server with configuration:');
+console.log('PORT:', PORT);
+console.log('HOSTNAME:', HOSTNAME);
+console.log('Current directory:', __dirname);
+console.log('Process ID:', process.pid);
+console.log('NO-IP DNS:', 'multiplayercardrive.ddns.net');
+console.log('Public IP:', '5.102.238.118');
+console.log('Server Type: Mobile Data (USB Tethering)');
+
+// Add error handling for the server
+http.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. Please try a different port or close the application using this port.`);
+    } else {
+        console.error('Server error:', error);
+    }
+    process.exit(1);
+});
+
+try {
+    http.listen(PORT, HOSTNAME, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log(`Local access: http://localhost:${PORT}`);
+        console.log(`External access: http://${process.env.RENDER_EXTERNAL_URL || 'localhost'}:${PORT}`);
+        console.log('Press Ctrl+C to stop the server');
+        console.log('\nTroubleshooting Info:');
+        console.log('- Make sure NO-IP DUC is running with green ticks');
+        console.log('- Verify mobile carrier allows port 8080');
+        console.log('- Check firewall rules for both inbound and outbound');
+    });
+} catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+} 
